@@ -29,4 +29,48 @@ public class EvaluationService {
         evaluationRepository.save(questionId, answer, result);
         return result;
     }
+    public EvaluationResult evaluate(Long questionId, String answer, Integer answerDurationSeconds) {
+        Question question = questionService.getQuestion(questionId);
+        EvaluationResult result = ensureDuration(
+                deepSeekClient.evaluate(promptBuilder.build(question, answer, answerDurationSeconds)),
+                answerDurationSeconds
+        );
+        evaluationRepository.save(questionId, answer, answerDurationSeconds, result);
+        return result;
+    }
+
+    private EvaluationResult ensureDuration(EvaluationResult result, Integer answerDurationSeconds) {
+        if (result.answerDurationSeconds() != null || answerDurationSeconds == null) {
+            return result;
+        }
+        return new EvaluationResult(
+                result.score(),
+                result.level(),
+                result.questionType(),
+                result.questionTypeReason(),
+                answerDurationSeconds,
+                result.durationComment(),
+                result.dimensionScores(),
+                result.scoreExplanation(),
+                result.scoreGapAssessment(),
+                result.majorDeductions(),
+                result.examinerHighlights(),
+                result.strengths(),
+                result.weaknesses(),
+                result.examinerPerspective(),
+                result.sentenceLevelProblems(),
+                result.priorityImprovements(),
+                result.contentAdvice(),
+                result.structureAdvice(),
+                result.expressionAdvice(),
+                result.answerFramework(),
+                result.goldenSentences(),
+                result.optimizedAnswer(),
+                result.sampleAnswer(),
+                result.memorizationOutline(),
+                result.deliveryAdvice(),
+                result.transferableScenarios(),
+                result.sampleAnswerOutline()
+        );
+    }
 }

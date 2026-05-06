@@ -22,5 +22,6 @@ public class EvaluationController {
     @PostMapping
     public EvaluationResult evaluate(@Valid @RequestBody EvaluationRequest request) {
         return evaluationService.evaluate(request.questionId(), request.answer());
+        return evaluationService.evaluate(request.questionId(), request.answer(), request.answerDurationSeconds());
     }
 }

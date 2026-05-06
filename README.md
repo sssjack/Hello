@@ -11,6 +11,11 @@
 - 支持文字作答。
 - 支持浏览器 Web Speech API 语音转文字。
 - Java 后端对接 DeepSeek API 进行结构化评分。
+- 支持 5 分钟倒计时训练，并记录本次作答用时。
+- 支持文字作答。
+- 支持浏览器 Web Speech API 语音转文字。
+- Java 后端对接 DeepSeek API 进行严格结构化评分。
+- 输出语言表达、内容深入、角度多元、政务思维及个性亮点、紧扣题意、逻辑结构六个维度的 10 分制评分和雷达图。
 - MySQL 存储题库与评分记录。
 - Redis 缓存题目年份等热点元数据。
 - Flyway 自动初始化数据库表和基础题库。
@@ -88,6 +93,8 @@ Content-Type: application/json
 {
   "questionId": 1,
   "answer": "我的回答内容……"
+  "answer": "我的回答内容……",
+  "answerDurationSeconds": 168
 }
 ```
 

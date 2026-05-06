@@ -10,6 +10,11 @@
 Spring Boot 应用
   ├─ QuestionController：年份查询、随机抽题
   ├─ EvaluationController：提交作答并评分
+  │  HTML/CSS/JS + Web Speech API + 5分钟倒计时 + 雷达图
+  ▼
+Spring Boot 应用
+  ├─ QuestionController：年份查询、随机抽题
+  ├─ EvaluationController：提交作答、作答用时并评分
   ├─ QuestionService：题目筛选、缓存读取
   ├─ EvaluationService：评分编排、评分记录保存
   ├─ DeepSeekClient：调用 DeepSeek Chat Completions API
@@ -26,6 +31,7 @@ Spring Boot 应用
 - `index.html`：页面结构。
 - `styles.css`：响应式样式。
 - `app.js`：抽题、语音输入、评分提交、结果渲染。
+- `app.js`：抽题、5分钟倒计时、作答用时统计、语音输入、评分提交、六维雷达图和结果渲染。
 
 ### Java 后端
 
@@ -62,6 +68,7 @@ GET /api/questions/random
 ```text
 POST /api/evaluations
   -> EvaluationController
+  -> 校验 answer + answerDurationSeconds
   -> EvaluationService.evaluate
   -> QuestionService.getQuestion
   -> PromptBuilder.build
@@ -84,4 +91,5 @@ POST /api/evaluations
 2. 按题型标签筛选，例如综合分析、组织管理、应急应变、人际沟通。
 3. 完整语音评分：接入服务端 ASR，并分析语速、停顿和口头禅。
 4. 管理后台：题库导入、题目审核、来源管理。
+5. 将六维评分趋势沉淀为个人能力画像。
 5. 分数趋势图和弱项分析。

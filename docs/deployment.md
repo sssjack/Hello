@@ -23,6 +23,8 @@
 | `REDIS_PASSWORD` | Redis 密码 | 空 |
 | `SERVER_PORT` | 应用端口 | `8080` |
 
+前端访问 8080 后，抽题页面会提供 5 分钟倒计时按钮；提交评分时会把本次作答用时一并发送给后端。
+
 请不要把真实 `DEEPSEEK_API_KEY` 写入仓库。用户提供的密钥应只放在服务器环境变量、CI/CD Secret 或 `.env` 本地文件中。
 
 ## 3. Docker Compose 部署

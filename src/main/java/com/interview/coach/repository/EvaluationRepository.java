@@ -25,6 +25,15 @@ public class EvaluationRepository {
                             """)
                     .param("questionId", questionId)
                     .param("answerText", answer)
+    public void save(Long questionId, String answer, Integer answerDurationSeconds, EvaluationResult result) {
+        try {
+            jdbcClient.sql("""
+                            insert into evaluations(question_id, answer_text, answer_duration_seconds, score, level, result_json)
+                            values (:questionId, :answerText, :answerDurationSeconds, :score, :level, :resultJson)
+                            """)
+                    .param("questionId", questionId)
+                    .param("answerText", answer)
+                    .param("answerDurationSeconds", answerDurationSeconds)
                     .param("score", result.score())
                     .param("level", result.level())
                     .param("resultJson", objectMapper.writeValueAsString(result))
