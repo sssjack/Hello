@@ -1,0 +1,104 @@
+package com.interview.coach.service;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.interview.coach.config.DeepSeekProperties;
+import com.interview.coach.dto.EvaluationResult;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+
+import java.util.List;
+import java.util.Map;
+
+@Component
+public class DeepSeekClient {
+
+    private final DeepSeekProperties properties;
+    private final ObjectMapper objectMapper;
+    private final RestClient restClient;
+
+    public DeepSeekClient(DeepSeekProperties properties, ObjectMapper objectMapper, RestClient.Builder builder) {
+        this.properties = properties;
+        this.objectMapper = objectMapper;
+        this.restClient = builder
+                .baseUrl(properties.baseUrl())
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .build();
+    }
+
+    public EvaluationResult evaluate(String prompt) {
+        if (!properties.configured()) {
+            return EvaluationResult.fallback("DeepSeek API Key 未配置，无法调用模型评分。");
+        }
+        Map<String, Object> payload = Map.of(
+                "model", properties.model(),
+                "messages", List.of(
+                        Map.of("role", "system", "content", "你是公务员/事业单位结构化面试评分专家，只返回合法 JSON。"),
+                        Map.of("role", "user", "content", prompt)
+                ),
+                "temperature", 0.2,
+                "response_format", Map.of("type", "json_object")
+        );
+        try {
+            String response = restClient.post()
+                    .uri("/chat/completions")
+                    .headers(headers -> headers.setBearerAuth(properties.apiKey()))
+                    .body(payload)
+                    .retrieve()
+                    .body(String.class);
+            return parseEvaluation(response);
+        } catch (Exception e) {
+            return EvaluationResult.fallback("AI 评分服务调用失败：" + e.getMessage());
+        }
+    }
+
+    private EvaluationResult parseEvaluation(String response) throws JsonProcessingException {
+        JsonNode root = objectMapper.readTree(response);
+        String content = root.path("choices").path(0).path("message").path("content").asText();
+        if (content == null || content.isBlank()) {
+            return EvaluationResult.fallback("AI 返回内容为空。原始响应已被系统拦截。");
+        }
+        EvaluationResult result = objectMapper.readValue(stripCodeFence(content), EvaluationResult.class);
+        int normalizedScore = Math.max(0, Math.min(100, result.score() == null ? 0 : result.score()));
+        return new EvaluationResult(
+                normalizedScore,
+                defaultText(result.level(), levelOf(normalizedScore)),
+                safeList(result.strengths()),
+                safeList(result.weaknesses()),
+                defaultText(result.contentAdvice(), "请围绕题干关键词补充原因、影响和对策。"),
+                defaultText(result.structureAdvice(), "建议使用“表态—分析—对策—升华”的结构。"),
+                defaultText(result.expressionAdvice(), "建议减少口语化表达，使用更规范的短句。"),
+                safeList(result.answerFramework()),
+                safeList(result.goldenSentences()),
+                safeList(result.sampleAnswerOutline())
+        );
+    }
+
+    private String stripCodeFence(String content) {
+        return content.replaceAll("^```(?:json)?\\s*", "").replaceAll("\\s*```$", "").trim();
+    }
+
+    private String levelOf(int score) {
+        if (score >= 85) {
+            return "优秀";
+        }
+        if (score >= 75) {
+            return "良好";
+        }
+        if (score >= 60) {
+            return "一般";
+        }
+        return "需提升";
+    }
+
+    private String defaultText(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private List<String> safeList(List<String> values) {
+        return values == null ? List.of() : values;
+    }
+}

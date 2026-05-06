@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>面试真题 AI 训练营</title>
+    <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+<div class="app">
+    <header class="hero">
+        <div>
+            <p class="eyebrow">省考 · 国考 · 事业编</p>
+            <h1>面试真题随机抽题与 AI 打分</h1>
+            <p class="subtitle">支持按年份、考试类型抽题，文字/语音作答，提交后获得分数、内容建议、解题思路和可积累金句。</p>
+        </div>
+        <div class="score-card">
+            <span>训练目标</span>
+            <strong>结构清晰 · 表达规范 · 对策落地</strong>
+        </div>
+    </header>
+
+    <main class="grid">
+        <section class="panel controls">
+            <h2>1. 抽取题目</h2>
+            <div class="form-row">
+                <label for="typeSelect">考试类型</label>
+                <select id="typeSelect">
+                    <option value="">全部类型</option>
+                    <option value="NATIONAL">国考</option>
+                    <option value="PROVINCIAL">省考</option>
+                    <option value="INSTITUTION">事业编</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label for="yearSelect">年份</label>
+                <select id="yearSelect">
+                    <option value="">全部年份</option>
+                </select>
+            </div>
+            <button id="randomBtn" class="primary">随机出题</button>
+            <p id="questionHint" class="hint">点击按钮后系统会从 MySQL 题库中随机抽取题目，年份列表会短时缓存到 Redis。</p>
+        </section>
+
+        <section class="panel question-panel">
+            <h2>2. 当前题目</h2>
+            <div id="questionMeta" class="meta">尚未抽题</div>
+            <div id="questionContent" class="question-empty">请选择年份/类型后点击“随机出题”。</div>
+        </section>
+
+        <section class="panel answer-panel">
+            <h2>3. 作答</h2>
+            <div class="toolbar">
+                <button id="startVoiceBtn" type="button">开始语音输入</button>
+                <button id="stopVoiceBtn" type="button" disabled>停止</button>
+                <span id="voiceStatus" class="hint">语音识别依赖浏览器支持。</span>
+            </div>
+            <textarea id="answerInput" placeholder="请在这里输入或通过语音转写你的回答。建议先用 2-3 分钟形成结构，再进行完整作答。"></textarea>
+            <div class="answer-footer">
+                <span id="wordCount">0 字</span>
+                <button id="evaluateBtn" class="primary" disabled>提交评分</button>
+            </div>
+        </section>
+
+        <section class="panel result-panel">
+            <h2>4. AI 评分与建议</h2>
+            <div id="loading" class="loading hidden">正在调用 DeepSeek 评分，请稍候...</div>
+            <div id="result" class="result-empty">提交回答后，这里会展示总分、优缺点、改进方向、答题框架、参考提纲和金句。</div>
+        </section>
+    </main>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>
