@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>面试真题 AI 训练营</title>
+    <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+<div class="shell">
+    <header class="hero glass">
+        <div class="hero-copy">
+            <p class="eyebrow">STRUCTURED INTERVIEW COACH</p>
+            <h1>省考 / 国考 / 事业编<br>结构化面试真题训练</h1>
+            <p class="subtitle">随机抽题、5分钟倒计时、语音/文字作答、DeepSeek 严格评分。输出题型判断、六维雷达图、逐句诊断、高分改写和考场表达建议。</p>
+        </div>
+        <div class="hero-metrics">
+            <div><span>评分视角</span><strong>真实考场</strong></div>
+            <div><span>训练时限</span><strong>05:00</strong></div>
+            <div><span>维度</span><strong>6 项 / 10分</strong></div>
+        </div>
+    </header>
+
+    <main class="layout">
+        <aside class="sidebar glass">
+            <div class="section-title">
+                <span>01</span>
+                <h2>抽题设置</h2>
+            </div>
+            <div class="form-row">
+                <label for="typeSelect">考试类型</label>
+                <select id="typeSelect">
+                    <option value="">全部类型</option>
+                    <option value="NATIONAL">国考</option>
+                    <option value="PROVINCIAL">省考</option>
+                    <option value="INSTITUTION">事业编</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label for="yearSelect">年份</label>
+                <select id="yearSelect">
+                    <option value="">全部年份</option>
+                </select>
+            </div>
+            <button id="randomBtn" class="primary">随机出题</button>
+            <p id="questionHint" class="microcopy">从 MySQL 题库抽题，年份元数据短时缓存到 Redis。</p>
+
+            <div class="timer-card">
+                <span class="timer-label">答题倒计时</span>
+                <strong id="timerDisplay">05:00</strong>
+                <div class="timer-track"><span id="timerProgress"></span></div>
+                <button id="startAnswerBtn" class="ghost" disabled>开始答题</button>
+                <p id="timerStatus" class="microcopy">抽题后点击开始，系统记录作答用时。</p>
+            </div>
+        </aside>
+
+        <section class="workspace">
+            <article class="question-card glass">
+                <div class="section-title">
+                    <span>02</span>
+                    <h2>当前题目</h2>
+                </div>
+                <div id="questionMeta" class="meta">尚未抽题</div>
+                <div id="questionContent" class="question-empty">请选择年份/类型后点击“随机出题”。</div>
+            </article>
+
+            <article class="answer-card glass">
+                <div class="section-title row-between">
+                    <div class="title-inline"><span>03</span><h2>现场作答</h2></div>
+                    <div class="answer-stats"><span id="wordCount">0 字</span><span id="durationDisplay">用时 00:00</span></div>
+                </div>
+                <div class="toolbar">
+                    <button id="startVoiceBtn" type="button">开始语音输入</button>
+                    <button id="stopVoiceBtn" type="button" disabled>停止</button>
+                    <span id="voiceStatus" class="microcopy">语音识别依赖浏览器支持。</span>
+                </div>
+                <textarea id="answerInput" placeholder="点击“开始答题”后，在这里输入或语音转写你的回答。建议按照“表态—分析—对策—升华”展开，控制在2-3分钟。"></textarea>
+                <div class="answer-footer">
+                    <span class="microcopy">提交后将获得六维评分、雷达图、逐句诊断和两版高分答案。</span>
+                    <button id="evaluateBtn" class="primary compact" disabled>提交严格评分</button>
+                </div>
+            </article>
+
+            <article class="result-card glass">
+                <div class="section-title">
+                    <span>04</span>
+                    <h2>评分报告</h2>
+                </div>
+                <div id="loading" class="loading hidden">正在调用 DeepSeek 严格评分，请稍候...</div>
+                <div id="result" class="result-empty">提交回答后，这里会展示总分、题型判断、六维雷达图、扣分点、亮点、逐句问题、高分改写、示例回答、背诵提纲和考场表达建议。</div>
+            </article>
+        </section>
+    </main>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>
