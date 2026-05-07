@@ -236,6 +236,21 @@ textarea {
     line-height: 1.8;
 }
 
+.custom-question-block {
+    display: grid;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+}
+
+.custom-question-input {
+    min-height: 126px;
+    padding: 13px;
+    font-size: 14px;
+    line-height: 1.65;
+}
+
 select:focus,
 textarea:focus {
     border-color: rgba(21, 94, 239, .55);

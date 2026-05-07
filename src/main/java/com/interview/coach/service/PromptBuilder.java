@@ -65,8 +65,8 @@ public class PromptBuilder {
 
                 评价必须结合考生原回答中的具体表达；如果原回答过短、过空或缺少段落，也要明确指出会如何扣分。
                 """.formatted(
-                question.examYear(),
-                question.examType().getLabel(),
+                question.examYear() == null ? "未指定" : question.examYear(),
+                question.examType() == null ? "未指定" : question.examType().getLabel(),
                 blankToDefault(question.province(), "全国/未注明"),
                 blankToDefault(question.source(), "题库收录"),
                 question.content(),

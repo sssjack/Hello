@@ -1,5 +1,6 @@
 package com.interview.coach.service;
 
+import com.interview.coach.domain.ExamType;
 import com.interview.coach.domain.Question;
 import com.interview.coach.dto.EvaluationResult;
 import com.interview.coach.repository.EvaluationRepository;
@@ -23,14 +24,45 @@ public class EvaluationService {
         this.evaluationRepository = evaluationRepository;
     }
 
-    public EvaluationResult evaluate(Long questionId, String answer, Integer answerDurationSeconds) {
-        Question question = questionService.getQuestion(questionId);
+    public EvaluationResult evaluate(Long questionId, String customQuestion, String answer, Integer answerDurationSeconds) {
+        String normalizedCustomQuestion = normalizeCustomQuestion(customQuestion);
+        Question question = resolveQuestion(questionId, normalizedCustomQuestion);
         EvaluationResult result = ensureDuration(
                 deepSeekClient.evaluate(promptBuilder.build(question, answer, answerDurationSeconds)),
                 answerDurationSeconds
         );
-        evaluationRepository.save(questionId, answer, answerDurationSeconds, result);
+        evaluationRepository.save(question.id(), normalizedCustomQuestion, answer, answerDurationSeconds, result);
         return result;
+    }
+
+    private Question resolveQuestion(Long questionId, String customQuestion) {
+        if (customQuestion != null) {
+            return new Question(
+                    null,
+                    null,
+                    ExamType.CUSTOM,
+                    "自定义",
+                    "用户自定义题目",
+                    "自定义题",
+                    customQuestion,
+                    null
+            );
+        }
+        if (questionId == null) {
+            throw new IllegalArgumentException("请先随机抽题或填写自定义题目");
+        }
+        return questionService.getQuestion(questionId);
+    }
+
+    private String normalizeCustomQuestion(String customQuestion) {
+        if (customQuestion == null || customQuestion.isBlank()) {
+            return null;
+        }
+        String normalized = customQuestion.trim();
+        if (normalized.length() < 5) {
+            throw new IllegalArgumentException("自定义题目内容过短");
+        }
+        return normalized;
     }
 
     private EvaluationResult ensureDuration(EvaluationResult result, Integer answerDurationSeconds) {

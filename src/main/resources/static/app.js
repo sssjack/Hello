@@ -15,6 +15,8 @@ const els = {
     typeSelect: document.querySelector('#typeSelect'),
     yearSelect: document.querySelector('#yearSelect'),
     randomBtn: document.querySelector('#randomBtn'),
+    customQuestionInput: document.querySelector('#customQuestionInput'),
+    useCustomQuestionBtn: document.querySelector('#useCustomQuestionBtn'),
     questionHint: document.querySelector('#questionHint'),
     questionMeta: document.querySelector('#questionMeta'),
     questionContent: document.querySelector('#questionContent'),
@@ -42,6 +44,7 @@ async function init() {
 
 function bindEvents() {
     els.randomBtn.addEventListener('click', randomQuestion);
+    els.useCustomQuestionBtn.addEventListener('click', useCustomQuestion);
     els.startAnswerBtn.addEventListener('click', startAnswerTimer);
     els.answerInput.addEventListener('input', () => {
         updateAnswerStats();
@@ -50,6 +53,33 @@ function bindEvents() {
     els.evaluateBtn.addEventListener('click', evaluateAnswer);
     els.startVoiceBtn.addEventListener('click', startVoice);
     els.stopVoiceBtn.addEventListener('click', stopVoice);
+}
+
+function useCustomQuestion() {
+    const content = els.customQuestionInput.value.trim();
+    if (content.length < 5) {
+        alert('请先输入完整的自定义题目。');
+        return;
+    }
+
+    state.currentQuestion = {
+        id: null,
+        custom: true,
+        typeLabel: '自定义题',
+        province: '自定义',
+        tags: '自定义题',
+        source: '用户输入',
+        content,
+    };
+    renderQuestion(state.currentQuestion);
+    resetTimer();
+    els.answerInput.value = '';
+    els.startAnswerBtn.disabled = false;
+    els.result.className = 'result-empty';
+    els.result.textContent = '已载入自定义题目。点击“开始答题”后提交评分。';
+    els.questionHint.textContent = '已使用自定义题目。';
+    updateAnswerStats();
+    updateEvaluateButton();
 }
 
 async function loadYears() {
@@ -113,9 +143,9 @@ function clearQuestion(message) {
 }
 
 function renderQuestion(question) {
-    els.questionHint.textContent = '抽题成功。';
-    els.questionMeta.textContent = [
-        `${question.year} 年`,
+    els.questionHint.textContent = question.custom ? '自定义题目已载入。' : '抽题成功。';
+    els.questionMeta.textContent = question.custom ? '自定义题 · 用户输入' : [
+        question.custom ? '自定义题' : `${question.year} 年`,
         question.typeLabel || question.type,
         question.province || '未注明地区',
         question.tags || '综合题型',
@@ -191,13 +221,19 @@ async function evaluateAnswer() {
     }
 
     const answerDurationSeconds = getElapsedSeconds();
+    const payload = {
+        questionId: state.currentQuestion.custom ? null : state.currentQuestion.id,
+        customQuestion: state.currentQuestion.custom ? state.currentQuestion.content : null,
+        answer,
+        answerDurationSeconds,
+    };
     els.evaluateBtn.disabled = true;
     els.loading.classList.remove('hidden');
     try {
         const result = await fetchJson('/api/evaluations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json; charset=utf-8' },
-            body: JSON.stringify({ questionId: state.currentQuestion.id, answer, answerDurationSeconds }),
+            body: JSON.stringify(payload),
         });
         renderResult(result, answerDurationSeconds);
     } catch (error) {
@@ -348,7 +384,7 @@ function setupSpeechRecognition() {
 
 function startVoice() {
     if (!state.currentQuestion) {
-        alert('请先抽取一道题目。');
+        alert('请先抽取一道题目或输入自定义题目。');
         return;
     }
     if (!state.answerStartedAt) startAnswerTimer();

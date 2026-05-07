@@ -48,6 +48,13 @@
             <button id="randomBtn" class="primary" type="button">随机出题</button>
             <p id="questionHint" class="microcopy">点击后从题库随机抽取一道题。</p>
 
+            <div class="custom-question-block">
+                <label for="customQuestionInput">自定义题目</label>
+                <textarea id="customQuestionInput" class="custom-question-input" placeholder="也可以把你自己的题目粘贴到这里，例如：请谈谈你对基层服务创新的理解。"></textarea>
+                <button id="useCustomQuestionBtn" class="ghost" type="button">使用自定义题目</button>
+                <p class="microcopy">自定义题不会写入正式题库，只用于本次 AI 评分。</p>
+            </div>
+
             <div class="timer-card">
                 <span class="timer-label">答题倒计时</span>
                 <strong id="timerDisplay">05:00</strong>
@@ -64,7 +71,7 @@
                     <h2>当前题目</h2>
                 </div>
                 <div id="questionMeta" class="meta">尚未抽题</div>
-                <div id="questionContent" class="question-empty">请选择年份或类型后点击“随机出题”。</div>
+                <div id="questionContent" class="question-empty">请选择年份或类型后点击“随机出题”，也可以在左侧输入自定义题目。</div>
             </article>
 
             <article class="answer-card panel">
