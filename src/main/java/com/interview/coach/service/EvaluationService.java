@@ -23,12 +23,6 @@ public class EvaluationService {
         this.evaluationRepository = evaluationRepository;
     }
 
-    public EvaluationResult evaluate(Long questionId, String answer) {
-        Question question = questionService.getQuestion(questionId);
-        EvaluationResult result = deepSeekClient.evaluate(promptBuilder.build(question, answer));
-        evaluationRepository.save(questionId, answer, result);
-        return result;
-    }
     public EvaluationResult evaluate(Long questionId, String answer, Integer answerDurationSeconds) {
         Question question = questionService.getQuestion(questionId);
         EvaluationResult result = ensureDuration(

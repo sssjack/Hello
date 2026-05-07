@@ -20,7 +20,6 @@ const els = {
     questionContent: document.querySelector('#questionContent'),
     answerInput: document.querySelector('#answerInput'),
     wordCount: document.querySelector('#wordCount'),
-    evaluateBtn: document.querySelector('#evaluateBtn'),
     durationDisplay: document.querySelector('#durationDisplay'),
     evaluateBtn: document.querySelector('#evaluateBtn'),
     startAnswerBtn: document.querySelector('#startAnswerBtn'),
@@ -35,30 +34,14 @@ const els = {
 };
 
 async function init() {
-    await loadYears();
     bindEvents();
     setupSpeechRecognition();
     resetTimer();
-}
-
-async function loadYears() {
-    try {
-        const years = await fetchJson('/api/questions/years');
-        years.forEach((year) => {
-            const option = document.createElement('option');
-            option.value = year;
-            option.textContent = `${year} 年`;
-            els.yearSelect.appendChild(option);
-        });
-    } catch (error) {
-        els.questionHint.textContent = `年份加载失败：${error.message}`;
-    }
+    await loadYears();
 }
 
 function bindEvents() {
     els.randomBtn.addEventListener('click', randomQuestion);
-    els.answerInput.addEventListener('input', () => {
-        els.wordCount.textContent = `${els.answerInput.value.trim().length} 字`;
     els.startAnswerBtn.addEventListener('click', startAnswerTimer);
     els.answerInput.addEventListener('input', () => {
         updateAnswerStats();
@@ -69,6 +52,26 @@ function bindEvents() {
     els.stopVoiceBtn.addEventListener('click', stopVoice);
 }
 
+async function loadYears() {
+    try {
+        const payload = await fetchJson('/api/questions/years');
+        const years = Array.isArray(payload) ? payload : payload?.value;
+        renderYearOptions(Array.isArray(years) ? years : []);
+    } catch (error) {
+        els.questionHint.textContent = `年份加载失败：${error.message}`;
+    }
+}
+
+function renderYearOptions(years) {
+    els.yearSelect.innerHTML = '<option value="">全部年份</option>';
+    years.forEach((year) => {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = `${year} 年`;
+        els.yearSelect.appendChild(option);
+    });
+}
+
 async function randomQuestion() {
     const params = new URLSearchParams();
     if (els.yearSelect.value) params.set('year', els.yearSelect.value);
@@ -77,23 +80,22 @@ async function randomQuestion() {
     els.randomBtn.disabled = true;
     els.questionHint.textContent = '正在抽题...';
     try {
-        const response = await fetch(`/api/questions/random?${params.toString()}`);
+        const query = params.toString();
+        const response = await fetch(`/api/questions/random${query ? `?${query}` : ''}`);
         if (response.status === 204) {
-            state.currentQuestion = null;
-            els.questionMeta.textContent = '没有匹配题目';
-            els.questionContent.textContent = '当前筛选条件下没有题目，请更换年份或考试类型。';
-            els.startAnswerBtn.disabled = true;
+            clearQuestion('当前筛选条件下没有题目，请更换年份或考试类型。');
             return;
         }
         if (!response.ok) throw new Error(await response.text());
+
         state.currentQuestion = await response.json();
         renderQuestion(state.currentQuestion);
-        els.result.className = 'result-empty';
-        els.result.textContent = '已抽取新题目，请作答后提交评分。';
         resetTimer();
+        els.answerInput.value = '';
         els.startAnswerBtn.disabled = false;
         els.result.className = 'result-empty';
-        els.result.textContent = '已抽取新题目。点击“开始答题”进入 5 分钟倒计时，作答后提交严格评分。';
+        els.result.textContent = '已抽取新题目。点击“开始答题”后再提交评分。';
+        updateAnswerStats();
     } catch (error) {
         els.questionHint.textContent = `抽题失败：${error.message}`;
     } finally {
@@ -102,9 +104,23 @@ async function randomQuestion() {
     }
 }
 
+function clearQuestion(message) {
+    state.currentQuestion = null;
+    els.questionMeta.textContent = '没有匹配题目';
+    els.questionContent.textContent = message;
+    els.startAnswerBtn.disabled = true;
+    resetTimer();
+}
+
 function renderQuestion(question) {
-    els.questionHint.textContent = '抽题成功。你可以继续点击随机出题更换题目。';
-    els.questionMeta.textContent = `${question.year} 年 · ${question.typeLabel} · ${question.province || '未注明地区'} · ${question.tags || '综合题型'} · ${question.source || '题库收录'}`;
+    els.questionHint.textContent = '抽题成功。';
+    els.questionMeta.textContent = [
+        `${question.year} 年`,
+        question.typeLabel || question.type,
+        question.province || '未注明地区',
+        question.tags || '综合题型',
+        question.source || '题库收录',
+    ].filter(Boolean).join(' · ');
     els.questionContent.textContent = question.content;
 }
 
@@ -115,10 +131,10 @@ function startAnswerTimer() {
     state.answerEndedAt = null;
     state.remainingSeconds = TOTAL_SECONDS;
     els.answerInput.value = '';
-    updateAnswerStats();
-    updateTimerDisplay();
-    els.timerStatus.textContent = '倒计时进行中，请按真实考场状态作答。';
     els.startAnswerBtn.textContent = '重新开始答题';
+    els.timerStatus.textContent = '倒计时进行中。';
+    updateTimerDisplay();
+    updateAnswerStats();
     state.timerId = window.setInterval(tickTimer, 1000);
     els.answerInput.focus();
     updateEvaluateButton();
@@ -133,7 +149,7 @@ function tickTimer() {
     if (state.remainingSeconds === 0) {
         window.clearInterval(state.timerId);
         state.answerEndedAt = Date.now();
-        els.timerStatus.textContent = '5 分钟已到，可继续润色，但考场建议控制在 2-3 分钟。';
+        els.timerStatus.textContent = '5 分钟已到，可继续补充。';
     }
 }
 
@@ -143,7 +159,7 @@ function resetTimer() {
     state.answerStartedAt = null;
     state.answerEndedAt = null;
     state.remainingSeconds = TOTAL_SECONDS;
-    els.timerStatus.textContent = state.currentQuestion ? '点击开始答题，系统将记录本题作答用时。' : '抽题后点击开始，系统记录作答用时。';
+    els.timerStatus.textContent = state.currentQuestion ? '点击开始答题，系统记录用时。' : '抽题后开始计时。';
     els.startAnswerBtn.textContent = '开始答题';
     updateTimerDisplay();
     updateAnswerStats();
@@ -163,27 +179,24 @@ function updateAnswerStats() {
 
 async function evaluateAnswer() {
     if (!state.currentQuestion) return;
+    if (!state.answerStartedAt) {
+        alert('请先点击“开始答题”，系统需要记录本题作答用时。');
+        return;
+    }
+
     const answer = els.answerInput.value.trim();
     if (answer.length < 20) {
-        alert('回答内容至少 20 字，建议完整作答后再评分。');
+        alert('回答内容至少 20 字。');
         return;
     }
-    els.evaluateBtn.disabled = true;
-    els.loading.classList.remove('hidden');
-    if (!state.answerStartedAt) {
-        alert('请先点击“开始答题”，系统需要记录你的作答用时。');
-        return;
-    }
-    els.evaluateBtn.disabled = true;
-    els.loading.classList.remove('hidden');
+
     const answerDurationSeconds = getElapsedSeconds();
+    els.evaluateBtn.disabled = true;
+    els.loading.classList.remove('hidden');
     try {
         const result = await fetchJson('/api/evaluations', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ questionId: state.currentQuestion.id, answer }),
-        });
-        renderResult(result);
+            headers: { 'Content-Type': 'application/json; charset=utf-8' },
             body: JSON.stringify({ questionId: state.currentQuestion.id, answer, answerDurationSeconds }),
         });
         renderResult(result, answerDurationSeconds);
@@ -194,21 +207,6 @@ async function evaluateAnswer() {
         els.loading.classList.add('hidden');
         updateEvaluateButton();
     }
-}
-
-function renderResult(result) {
-    els.result.className = '';
-    els.result.innerHTML = `
-        <div class="result-score"><strong>${escapeHtml(result.score ?? 0)}</strong><span>${escapeHtml(result.level || '暂未评级')}</span></div>
-        ${listSection('优点', result.strengths)}
-        ${listSection('不足', result.weaknesses)}
-        ${textSection('内容建议', result.contentAdvice)}
-        ${textSection('结构建议', result.structureAdvice)}
-        ${textSection('表达建议', result.expressionAdvice)}
-        ${listSection('解题思路', result.answerFramework)}
-        ${listSection('可积累金句', result.goldenSentences)}
-        ${listSection('参考答题提纲', result.sampleAnswerOutline)}
-    `;
 }
 
 function renderResult(result, measuredDuration) {
@@ -235,16 +233,16 @@ function renderResult(result, measuredDuration) {
         ${textSection('一、题型判断', result.questionTypeReason)}
         ${textSection('二、能否拉开分差', result.scoreGapAssessment)}
         ${listSection('三、主要扣分点', result.majorDeductions)}
-        ${listSection('四、考官能听出来的亮点', result.examinerHighlights)}
+        ${listSection('四、考官能听出的亮点', result.examinerHighlights)}
         ${listSection('五、面试官逐项评价', result.examinerPerspective)}
-        ${listSection('六、逐句/逐段具体问题', result.sentenceLevelProblems)}
+        ${listSection('六、逐句或逐段问题', result.sentenceLevelProblems)}
         ${listSection('七、可保留和强化的亮点', result.strengths)}
         ${listSection('八、优先级改进方向', result.priorityImprovements)}
         ${textSection('九、内容改进建议', result.contentAdvice)}
         ${textSection('十、结构改进建议', result.structureAdvice)}
         ${textSection('十一、表达改进建议', result.expressionAdvice)}
         ${listSection('十二、解题思路', result.answerFramework)}
-        ${listSection('十三、金句/机关话术', result.goldenSentences)}
+        ${listSection('十三、金句或机关话术', result.goldenSentences)}
         ${listSection('十四、保留你风格后的高分改写', result.optimizedAnswer, 'ordered-text')}
         ${listSection('十五、高分示例回答', result.sampleAnswer, 'ordered-text')}
         ${listSection('十六、关键词背诵提纲', result.memorizationOutline)}
@@ -260,14 +258,14 @@ function renderDimension(item) {
 function renderRadar(dimensions) {
     const size = 260;
     const center = size / 2;
-    const radius = 96;
+    const radius = 92;
     const points = dimensions.map((item, index) => pointFor(index, dimensions.length, radius * (item.score / 10), center)).join(' ');
     const rings = [0.25, 0.5, 0.75, 1]
         .map((scale) => `<polygon points="${dimensions.map((_, index) => pointFor(index, dimensions.length, radius * scale, center)).join(' ')}" />`)
         .join('');
     const axes = dimensions.map((item, index) => {
         const edge = pointFor(index, dimensions.length, radius, center).split(',');
-        const label = pointFor(index, dimensions.length, radius + 24, center).split(',');
+        const label = pointFor(index, dimensions.length, radius + 25, center).split(',');
         return `<line x1="${center}" y1="${center}" x2="${edge[0]}" y2="${edge[1]}" /><text x="${label[0]}" y="${label[1]}">${escapeHtml(shortName(item.name))}</text>`;
     }).join('');
     return `<svg viewBox="0 0 ${size} ${size}" class="radar" role="img" aria-label="六维评分雷达图">
@@ -302,9 +300,6 @@ function textSection(title, text) {
     return `<section class="result-section"><h3>${escapeHtml(title)}</h3><div class="text-block">${escapeHtml(text || '暂无')}</div></section>`;
 }
 
-function listSection(title, items = []) {
-    const normalized = Array.isArray(items) && items.length ? items : ['暂无'];
-    return `<section class="result-section"><h3>${escapeHtml(title)}</h3><ul>${normalized.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul></section>`;
 function listSection(title, items = [], extraClass = '') {
     const normalized = Array.isArray(items) && items.length ? items : ['暂无'];
     return `<section class="result-section ${extraClass}"><h3>${escapeHtml(title)}</h3><ul>${normalized.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul></section>`;
@@ -314,9 +309,10 @@ function setupSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
         els.startVoiceBtn.disabled = true;
-        els.voiceStatus.textContent = '当前浏览器不支持 Web Speech API，可直接文字输入。';
+        els.voiceStatus.textContent = '当前浏览器不支持语音识别，可直接文字输入。';
         return;
     }
+
     const recognition = new SpeechRecognition();
     recognition.lang = 'zh-CN';
     recognition.continuous = true;
@@ -334,19 +330,15 @@ function setupSpeechRecognition() {
         state.recognizing = false;
         els.startVoiceBtn.disabled = false;
         els.stopVoiceBtn.disabled = true;
-        els.voiceStatus.textContent = '语音输入已停止，可继续编辑文字。';
+        els.voiceStatus.textContent = '语音输入已停止。';
     };
     recognition.onresult = (event) => {
         let finalText = '';
         for (let i = event.resultIndex; i < event.results.length; i += 1) {
-            if (event.results[i].isFinal) {
-                finalText += event.results[i][0].transcript;
-            }
+            if (event.results[i].isFinal) finalText += event.results[i][0].transcript;
         }
         if (finalText) {
-            if (!state.answerStartedAt && state.currentQuestion) {
-                startAnswerTimer();
-            }
+            if (!state.answerStartedAt && state.currentQuestion) startAnswerTimer();
             els.answerInput.value = `${els.answerInput.value}${finalText}`;
             els.answerInput.dispatchEvent(new Event('input'));
         }
@@ -359,9 +351,7 @@ function startVoice() {
         alert('请先抽取一道题目。');
         return;
     }
-    if (!state.answerStartedAt) {
-        startAnswerTimer();
-    }
+    if (!state.answerStartedAt) startAnswerTimer();
     if (state.recognition && !state.recognizing) state.recognition.start();
 }
 
@@ -370,7 +360,6 @@ function stopVoice() {
 }
 
 function updateEvaluateButton() {
-    els.evaluateBtn.disabled = !state.currentQuestion || els.answerInput.value.trim().length < 20;
     els.evaluateBtn.disabled = !state.currentQuestion || !state.answerStartedAt || els.answerInput.value.trim().length < 20;
 }
 
@@ -390,8 +379,8 @@ function formatTime(seconds) {
 function formatDurationText(seconds) {
     const safe = Math.max(0, Number(seconds) || 0);
     const minutes = Math.floor(safe / 60);
-    const rest = Math.floor(safe % 60);
-    return `${minutes}分${rest.toString().padStart(2, '0')}秒`;
+    const rest = Math.floor(safe % 60).toString().padStart(2, '0');
+    return `${minutes}分${rest}秒`;
 }
 
 async function fetchJson(url, options) {

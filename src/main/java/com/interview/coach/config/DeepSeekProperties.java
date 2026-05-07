@@ -10,6 +10,6 @@ public record DeepSeekProperties(
         Integer timeoutSeconds
 ) {
     public boolean configured() {
-        return apiKey != null && !apiKey.isBlank();
+        return apiKey != null && !apiKey.isBlank() && !"sk-your-deepseek-key".equals(apiKey);
     }
 }

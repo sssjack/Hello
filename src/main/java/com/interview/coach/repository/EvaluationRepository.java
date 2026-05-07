@@ -17,14 +17,6 @@ public class EvaluationRepository {
         this.objectMapper = objectMapper;
     }
 
-    public void save(Long questionId, String answer, EvaluationResult result) {
-        try {
-            jdbcClient.sql("""
-                            insert into evaluations(question_id, answer_text, score, level, result_json)
-                            values (:questionId, :answerText, :score, :level, :resultJson)
-                            """)
-                    .param("questionId", questionId)
-                    .param("answerText", answer)
     public void save(Long questionId, String answer, Integer answerDurationSeconds, EvaluationResult result) {
         try {
             jdbcClient.sql("""

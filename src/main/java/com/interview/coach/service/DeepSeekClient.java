@@ -17,6 +17,15 @@ import java.util.Map;
 @Component
 public class DeepSeekClient {
 
+    private static final List<String> DIMENSION_NAMES = List.of(
+            "语言表达",
+            "内容深入",
+            "角度多元",
+            "政务思维及个性亮点",
+            "紧扣题意",
+            "逻辑结构"
+    );
+
     private final DeepSeekProperties properties;
     private final ObjectMapper objectMapper;
     private final RestClient restClient;
@@ -37,8 +46,7 @@ public class DeepSeekClient {
         Map<String, Object> payload = Map.of(
                 "model", properties.model(),
                 "messages", List.of(
-                        Map.of("role", "system", "content", "你是公务员/事业单位结构化面试评分专家，只返回合法 JSON。"),
-                        Map.of("role", "system", "content", "你是严格的公务员/事业单位结构化面试考官和面试教研老师，只返回合法 JSON。"),
+                        Map.of("role", "system", "content", "你是结构化面试评分专家，只返回合法 JSON。"),
                         Map.of("role", "user", "content", prompt)
                 ),
                 "temperature", 0.2,
@@ -61,15 +69,10 @@ public class DeepSeekClient {
         JsonNode root = objectMapper.readTree(response);
         String content = root.path("choices").path(0).path("message").path("content").asText();
         if (content == null || content.isBlank()) {
-            return EvaluationResult.fallback("AI 返回内容为空。原始响应已被系统拦截。");
+            content = response;
         }
+
         EvaluationResult result = objectMapper.readValue(stripCodeFence(content), EvaluationResult.class);
-        int normalizedScore = Math.max(0, Math.min(100, result.score() == null ? 0 : result.score()));
-        return new EvaluationResult(
-                normalizedScore,
-                defaultText(result.level(), levelOf(normalizedScore)),
-                safeList(result.strengths()),
-                safeList(result.weaknesses()),
         int normalizedScore = normalize(result.score(), 0, 100);
         return new EvaluationResult(
                 normalizedScore,
@@ -77,7 +80,7 @@ public class DeepSeekClient {
                 defaultText(result.questionType(), "未明确判断"),
                 defaultText(result.questionTypeReason(), "模型未给出题型依据。"),
                 result.answerDurationSeconds(),
-                defaultText(result.durationComment(), "建议结构化面试作答控制在 2 到 3 分钟，超时或过短都会影响考场观感。"),
+                defaultText(result.durationComment(), "建议结构化面试作答控制在 2 到 3 分钟。"),
                 normalizeDimensions(result.dimensionScores()),
                 defaultText(result.scoreExplanation(), "模型未给出总评。"),
                 defaultText(result.scoreGapAssessment(), "模型未判断分差表现。"),
@@ -89,7 +92,7 @@ public class DeepSeekClient {
                 safeList(result.sentenceLevelProblems()),
                 safeList(result.priorityImprovements()),
                 defaultText(result.contentAdvice(), "请围绕题干关键词补充原因、影响和对策。"),
-                defaultText(result.structureAdvice(), "建议使用“表态—分析—对策—升华”的结构。"),
+                defaultText(result.structureAdvice(), "建议使用“表态、分析、对策、升华”的结构。"),
                 defaultText(result.expressionAdvice(), "建议减少口语化表达，使用更规范的短句。"),
                 safeList(result.answerFramework()),
                 safeList(result.goldenSentences()),
@@ -107,16 +110,6 @@ public class DeepSeekClient {
     }
 
     private String levelOf(int score) {
-        if (score >= 85) {
-            return "优秀";
-        }
-        if (score >= 75) {
-            return "良好";
-        }
-        if (score >= 60) {
-            return "一般";
-        }
-        return "需提升";
         if (score >= 90) {
             return "高分答案";
         }
@@ -145,18 +138,16 @@ public class DeepSeekClient {
     }
 
     private List<DimensionScore> normalizeDimensions(List<DimensionScore> dimensions) {
-        List<String> names = List.of("语言表达", "内容深入", "角度多元", "政务思维及个性亮点", "紧扣题意", "逻辑结构");
-        if (dimensions == null || dimensions.isEmpty()) {
-            return names.stream()
-                    .map(name -> new DimensionScore(name, 0, "模型未返回该维度评分。"))
-                    .toList();
-        }
-        return names.stream()
-                .map(name -> dimensions.stream()
+        return DIMENSION_NAMES.stream()
+                .map(name -> dimensions == null ? new DimensionScore(name, 0, "模型未返回该维度评分") : dimensions.stream()
                         .filter(item -> name.equals(item.name()))
                         .findFirst()
-                        .map(item -> new DimensionScore(name, normalize(item.score(), 0, 10), defaultText(item.comment(), "暂无评价。")))
-                        .orElseGet(() -> new DimensionScore(name, 0, "模型未返回该维度评分。")))
+                        .map(item -> new DimensionScore(
+                                name,
+                                normalize(item.score(), 0, 10),
+                                defaultText(item.comment(), "暂无评价")
+                        ))
+                        .orElseGet(() -> new DimensionScore(name, 0, "模型未返回该维度评分")))
                 .toList();
     }
 }
