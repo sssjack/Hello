@@ -3,59 +3,77 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>面试真题 AI 训练营</title>
+    <title>事业编面试 AI 训练台</title>
     <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-<div class="shell">
-    <header class="hero">
-        <div class="hero-copy">
-            <p class="eyebrow">STRUCTURED INTERVIEW COACH</p>
-            <h1>结构化面试真题训练</h1>
-            <p class="subtitle">随机抽题、限时作答、语音输入、DeepSeek 评分。</p>
+<div class="app-shell">
+    <header class="app-header">
+        <div class="brand-block">
+            <p class="eyebrow">AI INTERVIEW STUDIO</p>
+            <h1>事业编结构化面试训练</h1>
+            <p class="subtitle">面向事业编结构化面试，聚焦表达、结构、内容和临场节奏复盘。</p>
         </div>
-        <div class="hero-metrics" aria-label="训练指标">
-            <div><span>评分视角</span><strong>真实考场</strong></div>
-            <div><span>训练时限</span><strong>05:00</strong></div>
-            <div><span>维度</span><strong>6 项 / 10 分</strong></div>
+        <div class="status-strip" aria-label="训练状态">
+            <div>
+                <span>题源</span>
+                <strong>默认随机</strong>
+            </div>
+            <div>
+                <span>计时</span>
+                <strong>05:00</strong>
+            </div>
+            <div>
+                <span>评分</span>
+                <strong>DeepSeek</strong>
+            </div>
         </div>
     </header>
 
-    <main class="layout">
-        <aside class="sidebar panel">
+    <main class="app-grid">
+        <aside class="control-panel panel" aria-labelledby="settingsTitle">
             <div class="section-title">
                 <span>01</span>
-                <h2>抽题设置</h2>
+                <h2 id="settingsTitle">出题模式</h2>
             </div>
 
-            <div class="form-row">
-                <label for="typeSelect">考试类型</label>
-                <select id="typeSelect">
-                    <option value="">全部类型</option>
-                    <option value="NATIONAL">国考</option>
-                    <option value="PROVINCIAL">省考</option>
-                    <option value="INSTITUTION">事业编</option>
-                </select>
+            <div class="mode-switch" role="group" aria-label="出题模式">
+                <button id="randomModeBtn" class="mode-option active" type="button" aria-pressed="true">随机题库</button>
+                <button id="customModeBtn" class="mode-option" type="button" aria-pressed="false">自定义题目</button>
             </div>
 
-            <div class="form-row">
-                <label for="yearSelect">年份</label>
-                <select id="yearSelect">
-                    <option value="">全部年份</option>
-                </select>
-            </div>
+            <section id="randomModePanel" class="mode-panel" aria-label="随机题库">
+                <div class="form-row">
+                    <label for="typeSelect">考试类型</label>
+                    <select id="typeSelect">
+                        <option value="">全部类型</option>
+                        <option value="NATIONAL">国考</option>
+                        <option value="PROVINCIAL">省考</option>
+                        <option value="INSTITUTION">事业编</option>
+                    </select>
+                </div>
 
-            <button id="randomBtn" class="primary" type="button">随机出题</button>
-            <p id="questionHint" class="microcopy">点击后从题库随机抽取一道题。</p>
+                <div class="form-row">
+                    <label for="yearSelect">年份</label>
+                    <select id="yearSelect">
+                        <option value="">全部年份</option>
+                    </select>
+                </div>
 
-            <div class="custom-question-block">
-                <label for="customQuestionInput">自定义题目</label>
-                <textarea id="customQuestionInput" class="custom-question-input" placeholder="也可以把你自己的题目粘贴到这里，例如：请谈谈你对基层服务创新的理解。"></textarea>
-                <button id="useCustomQuestionBtn" class="ghost" type="button">使用自定义题目</button>
-                <p class="microcopy">自定义题不会写入正式题库，只用于本次 AI 评分。</p>
-            </div>
+                <button id="randomBtn" class="primary" type="button">随机出题</button>
+            </section>
 
-            <div class="timer-card">
+            <section id="customModePanel" class="mode-panel hidden" aria-label="自定义题目">
+                <div class="form-row">
+                    <label for="customQuestionInput">题目内容</label>
+                    <textarea id="customQuestionInput" class="custom-question-input" placeholder="请输入你的自定义面试题目"></textarea>
+                </div>
+                <button id="useCustomQuestionBtn" class="primary" type="button">使用自定义题目</button>
+            </section>
+
+            <p id="questionHint" class="mode-hint">默认从题库随机抽题。</p>
+
+            <div class="timer-panel">
                 <span class="timer-label">答题倒计时</span>
                 <strong id="timerDisplay">05:00</strong>
                 <div class="timer-track" aria-hidden="true"><span id="timerProgress"></span></div>
@@ -70,8 +88,8 @@
                     <span>02</span>
                     <h2>当前题目</h2>
                 </div>
-                <div id="questionMeta" class="meta">尚未抽题</div>
-                <div id="questionContent" class="question-empty">请选择年份或类型后点击“随机出题”，也可以在左侧输入自定义题目。</div>
+                <div id="questionMeta" class="meta">尚未出题</div>
+                <div id="questionContent" class="question-empty">请选择随机题库或自定义题目。</div>
             </article>
 
             <article class="answer-card panel">
@@ -87,16 +105,16 @@
                 </div>
 
                 <div class="toolbar">
-                    <button id="startVoiceBtn" type="button">开始语音输入</button>
+                    <button id="startVoiceBtn" type="button">开始语音</button>
                     <button id="stopVoiceBtn" type="button" disabled>停止</button>
-                    <span id="voiceStatus" class="microcopy">语音识别依赖浏览器支持。</span>
+                    <span id="voiceStatus" class="microcopy">可直接输入文字。</span>
                 </div>
 
-                <textarea id="answerInput" placeholder="点击“开始答题”后，在这里输入或语音转写你的回答。"></textarea>
+                <textarea id="answerInput" placeholder="开始答题后，在这里输入你的回答"></textarea>
 
                 <div class="answer-footer">
                     <span class="microcopy">至少 20 字后可提交评分。</span>
-                    <button id="evaluateBtn" class="primary compact" type="button" disabled>提交严格评分</button>
+                    <button id="evaluateBtn" class="primary compact" type="button" disabled>提交评分</button>
                 </div>
             </article>
 
@@ -106,7 +124,7 @@
                     <h2>评分报告</h2>
                 </div>
                 <div id="loading" class="loading hidden">正在调用 DeepSeek 评分，请稍候...</div>
-                <div id="result" class="result-empty">提交回答后，这里会展示总分、题型判断、六维雷达图和改进建议。</div>
+                <div id="result" class="result-empty">评分结果会显示在这里。</div>
             </article>
         </section>
     </main>

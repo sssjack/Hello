@@ -3,6 +3,7 @@ const DIMENSION_NAMES = ['语言表达', '内容深入', '角度多元', '政务
 
 const state = {
     currentQuestion: null,
+    questionMode: 'random',
     recognition: null,
     recognizing: false,
     timerId: null,
@@ -12,6 +13,10 @@ const state = {
 };
 
 const els = {
+    randomModeBtn: document.querySelector('#randomModeBtn'),
+    customModeBtn: document.querySelector('#customModeBtn'),
+    randomModePanel: document.querySelector('#randomModePanel'),
+    customModePanel: document.querySelector('#customModePanel'),
     typeSelect: document.querySelector('#typeSelect'),
     yearSelect: document.querySelector('#yearSelect'),
     randomBtn: document.querySelector('#randomBtn'),
@@ -38,11 +43,14 @@ const els = {
 async function init() {
     bindEvents();
     setupSpeechRecognition();
+    setQuestionMode('random');
     resetTimer();
     await loadYears();
 }
 
 function bindEvents() {
+    els.randomModeBtn.addEventListener('click', () => setQuestionMode('random'));
+    els.customModeBtn.addEventListener('click', () => setQuestionMode('custom'));
     els.randomBtn.addEventListener('click', randomQuestion);
     els.useCustomQuestionBtn.addEventListener('click', useCustomQuestion);
     els.startAnswerBtn.addEventListener('click', startAnswerTimer);
@@ -55,7 +63,20 @@ function bindEvents() {
     els.stopVoiceBtn.addEventListener('click', stopVoice);
 }
 
+function setQuestionMode(mode) {
+    const isRandom = mode === 'random';
+    state.questionMode = isRandom ? 'random' : 'custom';
+    els.randomModeBtn.classList.toggle('active', isRandom);
+    els.customModeBtn.classList.toggle('active', !isRandom);
+    els.randomModeBtn.setAttribute('aria-pressed', String(isRandom));
+    els.customModeBtn.setAttribute('aria-pressed', String(!isRandom));
+    els.randomModePanel.classList.toggle('hidden', !isRandom);
+    els.customModePanel.classList.toggle('hidden', isRandom);
+    els.questionHint.textContent = isRandom ? '默认从题库随机抽题。' : '输入题目后即可载入评分。';
+}
+
 function useCustomQuestion() {
+    setQuestionMode('custom');
     const content = els.customQuestionInput.value.trim();
     if (content.length < 5) {
         alert('请先输入完整的自定义题目。');
@@ -65,21 +86,14 @@ function useCustomQuestion() {
     state.currentQuestion = {
         id: null,
         custom: true,
-        typeLabel: '自定义题',
+        typeLabel: '自定义题目',
         province: '自定义',
-        tags: '自定义题',
+        tags: '自定义题目',
         source: '用户输入',
         content,
     };
     renderQuestion(state.currentQuestion);
-    resetTimer();
-    els.answerInput.value = '';
-    els.startAnswerBtn.disabled = false;
-    els.result.className = 'result-empty';
-    els.result.textContent = '已载入自定义题目。点击“开始答题”后提交评分。';
-    els.questionHint.textContent = '已使用自定义题目。';
-    updateAnswerStats();
-    updateEvaluateButton();
+    prepareNewAnswer('已载入自定义题目。');
 }
 
 async function loadYears() {
@@ -103,6 +117,7 @@ function renderYearOptions(years) {
 }
 
 async function randomQuestion() {
+    setQuestionMode('random');
     const params = new URLSearchParams();
     if (els.yearSelect.value) params.set('year', els.yearSelect.value);
     if (els.typeSelect.value) params.set('type', els.typeSelect.value);
@@ -120,11 +135,7 @@ async function randomQuestion() {
 
         state.currentQuestion = await response.json();
         renderQuestion(state.currentQuestion);
-        resetTimer();
-        els.answerInput.value = '';
-        els.startAnswerBtn.disabled = false;
-        els.result.className = 'result-empty';
-        els.result.textContent = '已抽取新题目。点击“开始答题”后再提交评分。';
+        prepareNewAnswer('已抽取新题目。');
         updateAnswerStats();
     } catch (error) {
         els.questionHint.textContent = `抽题失败：${error.message}`;
@@ -134,18 +145,31 @@ async function randomQuestion() {
     }
 }
 
+function prepareNewAnswer(message) {
+    resetTimer();
+    els.answerInput.value = '';
+    els.startAnswerBtn.disabled = false;
+    els.result.className = 'result-empty';
+    els.result.textContent = `${message} 开始答题后提交评分。`;
+    updateAnswerStats();
+    updateEvaluateButton();
+}
+
 function clearQuestion(message) {
     state.currentQuestion = null;
     els.questionMeta.textContent = '没有匹配题目';
     els.questionContent.textContent = message;
     els.startAnswerBtn.disabled = true;
+    els.result.className = 'result-empty';
+    els.result.textContent = '评分结果会显示在这里。';
     resetTimer();
+    updateEvaluateButton();
 }
 
 function renderQuestion(question) {
-    els.questionHint.textContent = question.custom ? '自定义题目已载入。' : '抽题成功。';
+    els.questionHint.textContent = question.custom ? '已选择自定义题目。' : '抽题成功。';
     els.questionMeta.textContent = question.custom ? '自定义题 · 用户输入' : [
-        question.custom ? '自定义题' : `${question.year} 年`,
+        question.year ? `${question.year} 年` : null,
         question.typeLabel || question.type,
         question.province || '未注明地区',
         question.tags || '综合题型',
@@ -384,7 +408,7 @@ function setupSpeechRecognition() {
 
 function startVoice() {
     if (!state.currentQuestion) {
-        alert('请先抽取一道题目或输入自定义题目。');
+        alert('请先选择题目或输入自定义题目。');
         return;
     }
     if (!state.answerStartedAt) startAnswerTimer();
@@ -421,17 +445,20 @@ function formatDurationText(seconds) {
 
 async function fetchJson(url, options) {
     const response = await fetch(url, options);
+    const text = await response.text();
     if (!response.ok) {
         let message = response.statusText;
-        try {
-            const body = await response.json();
-            message = body.message || message;
-        } catch (_) {
-            message = await response.text();
+        if (text) {
+            try {
+                const body = JSON.parse(text);
+                message = body.message || body.error || message;
+            } catch (_) {
+                message = text;
+            }
         }
         throw new Error(message);
     }
-    return response.json();
+    return text ? JSON.parse(text) : null;
 }
 
 function escapeHtml(value) {

@@ -1,6 +1,7 @@
 package com.interview.coach.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.interview.coach.config.DeepSeekProperties;
@@ -10,6 +11,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
 import java.util.Map;
@@ -53,26 +55,37 @@ public class DeepSeekClient {
                 "response_format", Map.of("type", "json_object")
         );
         try {
-            String response = restClient.post()
+            JsonNode response = restClient.post()
                     .uri("/chat/completions")
                     .headers(headers -> headers.setBearerAuth(properties.apiKey()))
                     .body(payload)
                     .retrieve()
-                    .body(String.class);
+                    .body(JsonNode.class);
             return parseEvaluation(response);
+        } catch (RestClientResponseException e) {
+            return EvaluationResult.fallback("DeepSeek API 返回错误：" + extractApiError(e.getResponseBodyAsString()));
         } catch (Exception e) {
             return EvaluationResult.fallback("AI 评分服务调用失败：" + e.getMessage());
         }
     }
 
-    private EvaluationResult parseEvaluation(String response) throws JsonProcessingException {
-        JsonNode root = objectMapper.readTree(response);
-        String content = root.path("choices").path(0).path("message").path("content").asText();
-        if (content == null || content.isBlank()) {
-            content = response;
+    private EvaluationResult parseEvaluation(JsonNode root) throws JsonProcessingException {
+        if (root == null || root.isMissingNode() || root.isNull()) {
+            return EvaluationResult.fallback("DeepSeek API 返回内容为空。");
+        }
+        JsonNode error = root.path("error");
+        if (!error.isMissingNode() && !error.isNull()) {
+            return EvaluationResult.fallback("DeepSeek API 返回错误：" + extractApiError(root.toString()));
         }
 
-        EvaluationResult result = objectMapper.readValue(stripCodeFence(content), EvaluationResult.class);
+        String content = root.path("choices").path(0).path("message").path("content").asText();
+        if (content == null || content.isBlank()) {
+            content = root.toString();
+        }
+
+        EvaluationResult result = objectMapper.readerFor(EvaluationResult.class)
+                .without(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .readValue(stripCodeFence(content));
         int normalizedScore = normalize(result.score(), 0, 100);
         return new EvaluationResult(
                 normalizedScore,
@@ -103,6 +116,22 @@ public class DeepSeekClient {
                 safeList(result.transferableScenarios()),
                 safeList(result.sampleAnswerOutline())
         );
+    }
+
+    private String extractApiError(String responseBody) {
+        if (responseBody == null || responseBody.isBlank()) {
+            return "响应体为空";
+        }
+        try {
+            JsonNode root = objectMapper.readTree(responseBody);
+            String message = root.path("error").path("message").asText();
+            if (message != null && !message.isBlank()) {
+                return message;
+            }
+            return root.toString();
+        } catch (JsonProcessingException ignored) {
+            return responseBody;
+        }
     }
 
     private String stripCodeFence(String content) {
