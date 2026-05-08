@@ -13,6 +13,7 @@ const state = {
 };
 
 const els = {
+    photonCanvas: document.querySelector('#photonCanvas'),
     randomModeBtn: document.querySelector('#randomModeBtn'),
     customModeBtn: document.querySelector('#customModeBtn'),
     randomModePanel: document.querySelector('#randomModePanel'),
@@ -41,11 +42,149 @@ const els = {
 };
 
 async function init() {
+    initPhotonCursorEffect();
     bindEvents();
     setupSpeechRecognition();
     setQuestionMode('random');
     resetTimer();
     await loadYears();
+}
+
+function initPhotonCursorEffect() {
+    const canvas = els.photonCanvas;
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context || !window.matchMedia) return;
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const finePointer = window.matchMedia('(pointer: fine)');
+    const particles = [];
+    const pointer = {
+        x: window.innerWidth * 0.68,
+        y: window.innerHeight * 0.22,
+        active: false,
+    };
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
+    let lastEmit = 0;
+
+    const isEnabled = () => finePointer.matches && !reducedMotion.matches;
+
+    const resize = () => {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    const emitPhoton = (x, y, strength = 1) => {
+        const count = Math.round(2 + strength * 3);
+        for (let index = 0; index < count; index += 1) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 0.35 + Math.random() * 1.25;
+            particles.push({
+                x: x + (Math.random() - 0.5) * 12,
+                y: y + (Math.random() - 0.5) * 12,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 1,
+                decay: 0.014 + Math.random() * 0.018,
+                size: 1.2 + Math.random() * 2.8,
+                hue: Math.random() > 0.45 ? 214 : 184,
+            });
+        }
+        if (particles.length > 120) {
+            particles.splice(0, particles.length - 120);
+        }
+    };
+
+    const handlePointerMove = (event) => {
+        if (!isEnabled()) return;
+        pointer.x = event.clientX;
+        pointer.y = event.clientY;
+        pointer.active = true;
+        const now = performance.now();
+        if (now - lastEmit > 18) {
+            emitPhoton(pointer.x, pointer.y, Math.min(2.4, (now - lastEmit) / 28));
+            lastEmit = now;
+        }
+    };
+
+    const drawPointerGlow = () => {
+        if (!pointer.active) return;
+        const halo = context.createRadialGradient(pointer.x, pointer.y, 0, pointer.x, pointer.y, 190);
+        halo.addColorStop(0, 'rgba(37, 99, 235, 0.18)');
+        halo.addColorStop(0.28, 'rgba(8, 145, 178, 0.10)');
+        halo.addColorStop(1, 'rgba(37, 99, 235, 0)');
+        context.fillStyle = halo;
+        context.beginPath();
+        context.arc(pointer.x, pointer.y, 190, 0, Math.PI * 2);
+        context.fill();
+    };
+
+    const drawParticles = () => {
+        context.lineWidth = 1;
+        for (let index = particles.length - 1; index >= 0; index -= 1) {
+            const item = particles[index];
+            item.x += item.vx;
+            item.y += item.vy;
+            item.vx *= 0.985;
+            item.vy *= 0.985;
+            item.life -= item.decay;
+
+            if (item.life <= 0) {
+                particles.splice(index, 1);
+                continue;
+            }
+
+            const alpha = Math.max(0, item.life);
+            context.fillStyle = `hsla(${item.hue}, 92%, 58%, ${alpha * 0.42})`;
+            context.beginPath();
+            context.arc(item.x, item.y, item.size, 0, Math.PI * 2);
+            context.fill();
+
+            if (index % 3 === 0) {
+                context.strokeStyle = `hsla(${item.hue}, 90%, 62%, ${alpha * 0.12})`;
+                context.beginPath();
+                context.moveTo(item.x, item.y);
+                context.lineTo(pointer.x, pointer.y);
+                context.stroke();
+            }
+        }
+    };
+
+    const tick = () => {
+        context.clearRect(0, 0, width, height);
+        if (isEnabled()) {
+            context.globalCompositeOperation = 'lighter';
+            drawPointerGlow();
+            drawParticles();
+            context.globalCompositeOperation = 'source-over';
+        } else {
+            particles.length = 0;
+        }
+        window.requestAnimationFrame(tick);
+    };
+
+    const syncVisibility = () => {
+        canvas.hidden = !isEnabled();
+        if (canvas.hidden) {
+            particles.length = 0;
+            context.clearRect(0, 0, width, height);
+        }
+    };
+
+    resize();
+    syncVisibility();
+    window.addEventListener('resize', resize);
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    reducedMotion.addEventListener('change', syncVisibility);
+    finePointer.addEventListener('change', syncVisibility);
+    window.requestAnimationFrame(tick);
 }
 
 function bindEvents() {
