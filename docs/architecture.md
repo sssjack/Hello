@@ -5,6 +5,11 @@
 ```text
 浏览器
   │
+  │  HTML/CSS/JS + Web Speech API
+  ▼
+Spring Boot 应用
+  ├─ QuestionController：年份查询、随机抽题
+  ├─ EvaluationController：提交作答并评分
   │  HTML/CSS/JS + Web Speech API + 5分钟倒计时 + 雷达图
   ▼
 Spring Boot 应用
@@ -25,6 +30,7 @@ Spring Boot 应用
 
 - `index.html`：页面结构。
 - `styles.css`：响应式样式。
+- `app.js`：抽题、语音输入、评分提交、结果渲染。
 - `app.js`：抽题、5分钟倒计时、作答用时统计、语音输入、评分提交、六维雷达图和结果渲染。
 
 ### Java 后端

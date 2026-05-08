@@ -17,13 +17,18 @@ public class EvaluationRepository {
         this.objectMapper = objectMapper;
     }
 
-    public void save(Long questionId, String answer, Integer answerDurationSeconds, EvaluationResult result) {
+    public void save(Long questionId,
+                     String customQuestion,
+                     String answer,
+                     Integer answerDurationSeconds,
+                     EvaluationResult result) {
         try {
             jdbcClient.sql("""
-                            insert into evaluations(question_id, answer_text, answer_duration_seconds, score, level, result_json)
-                            values (:questionId, :answerText, :answerDurationSeconds, :score, :level, :resultJson)
+                            insert into evaluations(question_id, custom_question, answer_text, answer_duration_seconds, score, level, result_json)
+                            values (:questionId, :customQuestion, :answerText, :answerDurationSeconds, :score, :level, :resultJson)
                             """)
                     .param("questionId", questionId)
+                    .param("customQuestion", customQuestion)
                     .param("answerText", answer)
                     .param("answerDurationSeconds", answerDurationSeconds)
                     .param("score", result.score())

@@ -3,6 +3,7 @@ const DIMENSION_NAMES = ['语言表达', '内容深入', '角度多元', '政务
 
 const state = {
     currentQuestion: null,
+    questionMode: 'random',
     recognition: null,
     recognizing: false,
     timerId: null,
@@ -12,9 +13,16 @@ const state = {
 };
 
 const els = {
+    photonCanvas: document.querySelector('#photonCanvas'),
+    randomModeBtn: document.querySelector('#randomModeBtn'),
+    customModeBtn: document.querySelector('#customModeBtn'),
+    randomModePanel: document.querySelector('#randomModePanel'),
+    customModePanel: document.querySelector('#customModePanel'),
     typeSelect: document.querySelector('#typeSelect'),
     yearSelect: document.querySelector('#yearSelect'),
     randomBtn: document.querySelector('#randomBtn'),
+    customQuestionInput: document.querySelector('#customQuestionInput'),
+    useCustomQuestionBtn: document.querySelector('#useCustomQuestionBtn'),
     questionHint: document.querySelector('#questionHint'),
     questionMeta: document.querySelector('#questionMeta'),
     questionContent: document.querySelector('#questionContent'),
@@ -34,28 +42,156 @@ const els = {
 };
 
 async function init() {
-    await loadYears();
+    initPhotonCursorEffect();
     bindEvents();
     setupSpeechRecognition();
+    setQuestionMode('random');
     resetTimer();
+    await loadYears();
 }
 
-async function loadYears() {
-    try {
-        const years = await fetchJson('/api/questions/years');
-        years.forEach((year) => {
-            const option = document.createElement('option');
-            option.value = year;
-            option.textContent = `${year} 年`;
-            els.yearSelect.appendChild(option);
-        });
-    } catch (error) {
-        els.questionHint.textContent = `年份加载失败：${error.message}`;
-    }
+function initPhotonCursorEffect() {
+    const canvas = els.photonCanvas;
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context || !window.matchMedia) return;
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const finePointer = window.matchMedia('(pointer: fine)');
+    const particles = [];
+    const pointer = {
+        x: window.innerWidth * 0.68,
+        y: window.innerHeight * 0.22,
+        active: false,
+    };
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
+    let lastEmit = 0;
+
+    const isEnabled = () => finePointer.matches && !reducedMotion.matches;
+
+    const resize = () => {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    const emitPhoton = (x, y, strength = 1) => {
+        const count = Math.round(2 + strength * 3);
+        for (let index = 0; index < count; index += 1) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 0.35 + Math.random() * 1.25;
+            particles.push({
+                x: x + (Math.random() - 0.5) * 12,
+                y: y + (Math.random() - 0.5) * 12,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 1,
+                decay: 0.014 + Math.random() * 0.018,
+                size: 1.2 + Math.random() * 2.8,
+                hue: Math.random() > 0.45 ? 214 : 184,
+            });
+        }
+        if (particles.length > 120) {
+            particles.splice(0, particles.length - 120);
+        }
+    };
+
+    const handlePointerMove = (event) => {
+        if (!isEnabled()) return;
+        pointer.x = event.clientX;
+        pointer.y = event.clientY;
+        pointer.active = true;
+        const now = performance.now();
+        if (now - lastEmit > 18) {
+            emitPhoton(pointer.x, pointer.y, Math.min(2.4, (now - lastEmit) / 28));
+            lastEmit = now;
+        }
+    };
+
+    const drawPointerGlow = () => {
+        if (!pointer.active) return;
+        const halo = context.createRadialGradient(pointer.x, pointer.y, 0, pointer.x, pointer.y, 190);
+        halo.addColorStop(0, 'rgba(37, 99, 235, 0.18)');
+        halo.addColorStop(0.28, 'rgba(8, 145, 178, 0.10)');
+        halo.addColorStop(1, 'rgba(37, 99, 235, 0)');
+        context.fillStyle = halo;
+        context.beginPath();
+        context.arc(pointer.x, pointer.y, 190, 0, Math.PI * 2);
+        context.fill();
+    };
+
+    const drawParticles = () => {
+        context.lineWidth = 1;
+        for (let index = particles.length - 1; index >= 0; index -= 1) {
+            const item = particles[index];
+            item.x += item.vx;
+            item.y += item.vy;
+            item.vx *= 0.985;
+            item.vy *= 0.985;
+            item.life -= item.decay;
+
+            if (item.life <= 0) {
+                particles.splice(index, 1);
+                continue;
+            }
+
+            const alpha = Math.max(0, item.life);
+            context.fillStyle = `hsla(${item.hue}, 92%, 58%, ${alpha * 0.42})`;
+            context.beginPath();
+            context.arc(item.x, item.y, item.size, 0, Math.PI * 2);
+            context.fill();
+
+            if (index % 3 === 0) {
+                context.strokeStyle = `hsla(${item.hue}, 90%, 62%, ${alpha * 0.12})`;
+                context.beginPath();
+                context.moveTo(item.x, item.y);
+                context.lineTo(pointer.x, pointer.y);
+                context.stroke();
+            }
+        }
+    };
+
+    const tick = () => {
+        context.clearRect(0, 0, width, height);
+        if (isEnabled()) {
+            context.globalCompositeOperation = 'lighter';
+            drawPointerGlow();
+            drawParticles();
+            context.globalCompositeOperation = 'source-over';
+        } else {
+            particles.length = 0;
+        }
+        window.requestAnimationFrame(tick);
+    };
+
+    const syncVisibility = () => {
+        canvas.hidden = !isEnabled();
+        if (canvas.hidden) {
+            particles.length = 0;
+            context.clearRect(0, 0, width, height);
+        }
+    };
+
+    resize();
+    syncVisibility();
+    window.addEventListener('resize', resize);
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    reducedMotion.addEventListener('change', syncVisibility);
+    finePointer.addEventListener('change', syncVisibility);
+    window.requestAnimationFrame(tick);
 }
 
 function bindEvents() {
+    els.randomModeBtn.addEventListener('click', () => setQuestionMode('random'));
+    els.customModeBtn.addEventListener('click', () => setQuestionMode('custom'));
     els.randomBtn.addEventListener('click', randomQuestion);
+    els.useCustomQuestionBtn.addEventListener('click', useCustomQuestion);
     els.startAnswerBtn.addEventListener('click', startAnswerTimer);
     els.answerInput.addEventListener('input', () => {
         updateAnswerStats();
@@ -66,7 +202,61 @@ function bindEvents() {
     els.stopVoiceBtn.addEventListener('click', stopVoice);
 }
 
+function setQuestionMode(mode) {
+    const isRandom = mode === 'random';
+    state.questionMode = isRandom ? 'random' : 'custom';
+    els.randomModeBtn.classList.toggle('active', isRandom);
+    els.customModeBtn.classList.toggle('active', !isRandom);
+    els.randomModeBtn.setAttribute('aria-pressed', String(isRandom));
+    els.customModeBtn.setAttribute('aria-pressed', String(!isRandom));
+    els.randomModePanel.classList.toggle('hidden', !isRandom);
+    els.customModePanel.classList.toggle('hidden', isRandom);
+    els.questionHint.textContent = isRandom ? '默认从题库随机抽题。' : '输入题目后即可载入评分。';
+}
+
+function useCustomQuestion() {
+    setQuestionMode('custom');
+    const content = els.customQuestionInput.value.trim();
+    if (content.length < 5) {
+        alert('请先输入完整的自定义题目。');
+        return;
+    }
+
+    state.currentQuestion = {
+        id: null,
+        custom: true,
+        typeLabel: '自定义题目',
+        province: '自定义',
+        tags: '自定义题目',
+        source: '用户输入',
+        content,
+    };
+    renderQuestion(state.currentQuestion);
+    prepareNewAnswer('已载入自定义题目。');
+}
+
+async function loadYears() {
+    try {
+        const payload = await fetchJson('/api/questions/years');
+        const years = Array.isArray(payload) ? payload : payload?.value;
+        renderYearOptions(Array.isArray(years) ? years : []);
+    } catch (error) {
+        els.questionHint.textContent = `年份加载失败：${error.message}`;
+    }
+}
+
+function renderYearOptions(years) {
+    els.yearSelect.innerHTML = '<option value="">全部年份</option>';
+    years.forEach((year) => {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = `${year} 年`;
+        els.yearSelect.appendChild(option);
+    });
+}
+
 async function randomQuestion() {
+    setQuestionMode('random');
     const params = new URLSearchParams();
     if (els.yearSelect.value) params.set('year', els.yearSelect.value);
     if (els.typeSelect.value) params.set('type', els.typeSelect.value);
@@ -74,21 +264,18 @@ async function randomQuestion() {
     els.randomBtn.disabled = true;
     els.questionHint.textContent = '正在抽题...';
     try {
-        const response = await fetch(`/api/questions/random?${params.toString()}`);
+        const query = params.toString();
+        const response = await fetch(`/api/questions/random${query ? `?${query}` : ''}`);
         if (response.status === 204) {
-            state.currentQuestion = null;
-            els.questionMeta.textContent = '没有匹配题目';
-            els.questionContent.textContent = '当前筛选条件下没有题目，请更换年份或考试类型。';
-            els.startAnswerBtn.disabled = true;
+            clearQuestion('当前筛选条件下没有题目，请更换年份或考试类型。');
             return;
         }
         if (!response.ok) throw new Error(await response.text());
+
         state.currentQuestion = await response.json();
         renderQuestion(state.currentQuestion);
-        resetTimer();
-        els.startAnswerBtn.disabled = false;
-        els.result.className = 'result-empty';
-        els.result.textContent = '已抽取新题目。点击“开始答题”进入 5 分钟倒计时，作答后提交严格评分。';
+        prepareNewAnswer('已抽取新题目。');
+        updateAnswerStats();
     } catch (error) {
         els.questionHint.textContent = `抽题失败：${error.message}`;
     } finally {
@@ -97,9 +284,36 @@ async function randomQuestion() {
     }
 }
 
+function prepareNewAnswer(message) {
+    resetTimer();
+    els.answerInput.value = '';
+    els.startAnswerBtn.disabled = false;
+    els.result.className = 'result-empty';
+    els.result.textContent = `${message} 开始答题后提交评分。`;
+    updateAnswerStats();
+    updateEvaluateButton();
+}
+
+function clearQuestion(message) {
+    state.currentQuestion = null;
+    els.questionMeta.textContent = '没有匹配题目';
+    els.questionContent.textContent = message;
+    els.startAnswerBtn.disabled = true;
+    els.result.className = 'result-empty';
+    els.result.textContent = '评分结果会显示在这里。';
+    resetTimer();
+    updateEvaluateButton();
+}
+
 function renderQuestion(question) {
-    els.questionHint.textContent = '抽题成功。你可以继续点击随机出题更换题目。';
-    els.questionMeta.textContent = `${question.year} 年 · ${question.typeLabel} · ${question.province || '未注明地区'} · ${question.tags || '综合题型'} · ${question.source || '题库收录'}`;
+    els.questionHint.textContent = question.custom ? '已选择自定义题目。' : '抽题成功。';
+    els.questionMeta.textContent = question.custom ? '自定义题 · 用户输入' : [
+        question.year ? `${question.year} 年` : null,
+        question.typeLabel || question.type,
+        question.province || '未注明地区',
+        question.tags || '综合题型',
+        question.source || '题库收录',
+    ].filter(Boolean).join(' · ');
     els.questionContent.textContent = question.content;
 }
 
@@ -110,10 +324,10 @@ function startAnswerTimer() {
     state.answerEndedAt = null;
     state.remainingSeconds = TOTAL_SECONDS;
     els.answerInput.value = '';
-    updateAnswerStats();
-    updateTimerDisplay();
-    els.timerStatus.textContent = '倒计时进行中，请按真实考场状态作答。';
     els.startAnswerBtn.textContent = '重新开始答题';
+    els.timerStatus.textContent = '倒计时进行中。';
+    updateTimerDisplay();
+    updateAnswerStats();
     state.timerId = window.setInterval(tickTimer, 1000);
     els.answerInput.focus();
     updateEvaluateButton();
@@ -128,7 +342,7 @@ function tickTimer() {
     if (state.remainingSeconds === 0) {
         window.clearInterval(state.timerId);
         state.answerEndedAt = Date.now();
-        els.timerStatus.textContent = '5 分钟已到，可继续润色，但考场建议控制在 2-3 分钟。';
+        els.timerStatus.textContent = '5 分钟已到，可继续补充。';
     }
 }
 
@@ -138,7 +352,7 @@ function resetTimer() {
     state.answerStartedAt = null;
     state.answerEndedAt = null;
     state.remainingSeconds = TOTAL_SECONDS;
-    els.timerStatus.textContent = state.currentQuestion ? '点击开始答题，系统将记录本题作答用时。' : '抽题后点击开始，系统记录作答用时。';
+    els.timerStatus.textContent = state.currentQuestion ? '点击开始答题，系统记录用时。' : '抽题后开始计时。';
     els.startAnswerBtn.textContent = '开始答题';
     updateTimerDisplay();
     updateAnswerStats();
@@ -158,23 +372,31 @@ function updateAnswerStats() {
 
 async function evaluateAnswer() {
     if (!state.currentQuestion) return;
+    if (!state.answerStartedAt) {
+        alert('请先点击“开始答题”，系统需要记录本题作答用时。');
+        return;
+    }
+
     const answer = els.answerInput.value.trim();
     if (answer.length < 20) {
-        alert('回答内容至少 20 字，建议完整作答后再评分。');
+        alert('回答内容至少 20 字。');
         return;
     }
-    if (!state.answerStartedAt) {
-        alert('请先点击“开始答题”，系统需要记录你的作答用时。');
-        return;
-    }
+
+    const answerDurationSeconds = getElapsedSeconds();
+    const payload = {
+        questionId: state.currentQuestion.custom ? null : state.currentQuestion.id,
+        customQuestion: state.currentQuestion.custom ? state.currentQuestion.content : null,
+        answer,
+        answerDurationSeconds,
+    };
     els.evaluateBtn.disabled = true;
     els.loading.classList.remove('hidden');
-    const answerDurationSeconds = getElapsedSeconds();
     try {
         const result = await fetchJson('/api/evaluations', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ questionId: state.currentQuestion.id, answer, answerDurationSeconds }),
+            headers: { 'Content-Type': 'application/json; charset=utf-8' },
+            body: JSON.stringify(payload),
         });
         renderResult(result, answerDurationSeconds);
     } catch (error) {
@@ -210,16 +432,16 @@ function renderResult(result, measuredDuration) {
         ${textSection('一、题型判断', result.questionTypeReason)}
         ${textSection('二、能否拉开分差', result.scoreGapAssessment)}
         ${listSection('三、主要扣分点', result.majorDeductions)}
-        ${listSection('四、考官能听出来的亮点', result.examinerHighlights)}
+        ${listSection('四、考官能听出的亮点', result.examinerHighlights)}
         ${listSection('五、面试官逐项评价', result.examinerPerspective)}
-        ${listSection('六、逐句/逐段具体问题', result.sentenceLevelProblems)}
+        ${listSection('六、逐句或逐段问题', result.sentenceLevelProblems)}
         ${listSection('七、可保留和强化的亮点', result.strengths)}
         ${listSection('八、优先级改进方向', result.priorityImprovements)}
         ${textSection('九、内容改进建议', result.contentAdvice)}
         ${textSection('十、结构改进建议', result.structureAdvice)}
         ${textSection('十一、表达改进建议', result.expressionAdvice)}
         ${listSection('十二、解题思路', result.answerFramework)}
-        ${listSection('十三、金句/机关话术', result.goldenSentences)}
+        ${listSection('十三、金句或机关话术', result.goldenSentences)}
         ${listSection('十四、保留你风格后的高分改写', result.optimizedAnswer, 'ordered-text')}
         ${listSection('十五、高分示例回答', result.sampleAnswer, 'ordered-text')}
         ${listSection('十六、关键词背诵提纲', result.memorizationOutline)}
@@ -235,14 +457,14 @@ function renderDimension(item) {
 function renderRadar(dimensions) {
     const size = 260;
     const center = size / 2;
-    const radius = 96;
+    const radius = 92;
     const points = dimensions.map((item, index) => pointFor(index, dimensions.length, radius * (item.score / 10), center)).join(' ');
     const rings = [0.25, 0.5, 0.75, 1]
         .map((scale) => `<polygon points="${dimensions.map((_, index) => pointFor(index, dimensions.length, radius * scale, center)).join(' ')}" />`)
         .join('');
     const axes = dimensions.map((item, index) => {
         const edge = pointFor(index, dimensions.length, radius, center).split(',');
-        const label = pointFor(index, dimensions.length, radius + 24, center).split(',');
+        const label = pointFor(index, dimensions.length, radius + 25, center).split(',');
         return `<line x1="${center}" y1="${center}" x2="${edge[0]}" y2="${edge[1]}" /><text x="${label[0]}" y="${label[1]}">${escapeHtml(shortName(item.name))}</text>`;
     }).join('');
     return `<svg viewBox="0 0 ${size} ${size}" class="radar" role="img" aria-label="六维评分雷达图">
@@ -286,9 +508,10 @@ function setupSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
         els.startVoiceBtn.disabled = true;
-        els.voiceStatus.textContent = '当前浏览器不支持 Web Speech API，可直接文字输入。';
+        els.voiceStatus.textContent = '当前浏览器不支持语音识别，可直接文字输入。';
         return;
     }
+
     const recognition = new SpeechRecognition();
     recognition.lang = 'zh-CN';
     recognition.continuous = true;
@@ -306,19 +529,15 @@ function setupSpeechRecognition() {
         state.recognizing = false;
         els.startVoiceBtn.disabled = false;
         els.stopVoiceBtn.disabled = true;
-        els.voiceStatus.textContent = '语音输入已停止，可继续编辑文字。';
+        els.voiceStatus.textContent = '语音输入已停止。';
     };
     recognition.onresult = (event) => {
         let finalText = '';
         for (let i = event.resultIndex; i < event.results.length; i += 1) {
-            if (event.results[i].isFinal) {
-                finalText += event.results[i][0].transcript;
-            }
+            if (event.results[i].isFinal) finalText += event.results[i][0].transcript;
         }
         if (finalText) {
-            if (!state.answerStartedAt && state.currentQuestion) {
-                startAnswerTimer();
-            }
+            if (!state.answerStartedAt && state.currentQuestion) startAnswerTimer();
             els.answerInput.value = `${els.answerInput.value}${finalText}`;
             els.answerInput.dispatchEvent(new Event('input'));
         }
@@ -328,12 +547,10 @@ function setupSpeechRecognition() {
 
 function startVoice() {
     if (!state.currentQuestion) {
-        alert('请先抽取一道题目。');
+        alert('请先选择题目或输入自定义题目。');
         return;
     }
-    if (!state.answerStartedAt) {
-        startAnswerTimer();
-    }
+    if (!state.answerStartedAt) startAnswerTimer();
     if (state.recognition && !state.recognizing) state.recognition.start();
 }
 
@@ -361,23 +578,26 @@ function formatTime(seconds) {
 function formatDurationText(seconds) {
     const safe = Math.max(0, Number(seconds) || 0);
     const minutes = Math.floor(safe / 60);
-    const rest = Math.floor(safe % 60);
-    return `${minutes}分${rest.toString().padStart(2, '0')}秒`;
+    const rest = Math.floor(safe % 60).toString().padStart(2, '0');
+    return `${minutes}分${rest}秒`;
 }
 
 async function fetchJson(url, options) {
     const response = await fetch(url, options);
+    const text = await response.text();
     if (!response.ok) {
         let message = response.statusText;
-        try {
-            const body = await response.json();
-            message = body.message || message;
-        } catch (_) {
-            message = await response.text();
+        if (text) {
+            try {
+                const body = JSON.parse(text);
+                message = body.message || body.error || message;
+            } catch (_) {
+                message = text;
+            }
         }
         throw new Error(message);
     }
-    return response.json();
+    return text ? JSON.parse(text) : null;
 }
 
 function escapeHtml(value) {

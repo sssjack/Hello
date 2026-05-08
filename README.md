@@ -8,6 +8,9 @@
 
 - 随机抽取历年省考/国考/事业编面试题。
 - 支持按年份、考试类型筛选。
+- 支持文字作答。
+- 支持浏览器 Web Speech API 语音转文字。
+- Java 后端对接 DeepSeek API 进行结构化评分。
 - 支持 5 分钟倒计时训练，并记录本次作答用时。
 - 支持文字作答。
 - 支持浏览器 Web Speech API 语音转文字。
@@ -89,6 +92,7 @@ Content-Type: application/json
 
 {
   "questionId": 1,
+  "answer": "我的回答内容……"
   "answer": "我的回答内容……",
   "answerDurationSeconds": 168
 }

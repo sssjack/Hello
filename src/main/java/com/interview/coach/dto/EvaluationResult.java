@@ -36,12 +36,12 @@ public record EvaluationResult(
 
     public static EvaluationResult fallback(String message) {
         List<DimensionScore> dimensions = List.of(
-                new DimensionScore("语言表达", 0, "未完成模型评分"),
-                new DimensionScore("内容深入", 0, "未完成模型评分"),
-                new DimensionScore("角度多元", 0, "未完成模型评分"),
-                new DimensionScore("政务思维及个性亮点", 0, "未完成模型评分"),
-                new DimensionScore("紧扣题意", 0, "未完成模型评分"),
-                new DimensionScore("逻辑结构", 0, "未完成模型评分")
+                new DimensionScore("语言表达", 0, "模型评分未完成"),
+                new DimensionScore("内容深入", 0, "模型评分未完成"),
+                new DimensionScore("角度多元", 0, "模型评分未完成"),
+                new DimensionScore("政务思维及个性亮点", 0, "模型评分未完成"),
+                new DimensionScore("紧扣题意", 0, "模型评分未完成"),
+                new DimensionScore("逻辑结构", 0, "模型评分未完成")
         );
         return new EvaluationResult(
                 0,
@@ -58,11 +58,11 @@ public record EvaluationResult(
                 List.of(),
                 List.of(message),
                 List.of("审题、立意、结构、内容、措施、表达等维度需要在模型恢复后重新评估。"),
-                List.of("当前无法进行逐句诊断，请先确保 DeepSeek API 配置可用。"),
+                List.of("当前无法进行逐句诊断，请先确认 DeepSeek API 配置可用。"),
                 List.of("先恢复 AI 评分服务", "再围绕题干关键词完成一次完整作答", "最后根据维度分定位短板"),
                 "请检查 AI 服务配置后重试。",
-                "可先按照“表态—分析—对策—升华”的结构整理答案。",
-                "建议控制语速、减少口头禅，并使用短句表达。",
+                "可先按照“表态、分析、对策、升华”的结构整理答案。",
+                "建议控制语速、减少口头语，并使用短句表达。",
                 List.of("明确问题本质", "分析原因和影响", "提出分层对策", "结合岗位价值收束"),
                 List.of("民生无小事，枝叶总关情。", "把群众的急难愁盼作为工作的出发点和落脚点。"),
                 List.of("暂无优化答案。"),
